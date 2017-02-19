@@ -1,0 +1,81 @@
+/*****************************************************************************/
+/**
+ * @file       usage.info
+ * @brief      Documentation about the XXX component usage
+ * @author     XXX (CENTUM Solutions SLU)
+ * @date       YYYY.MM.DD
+ * @version    x.y.z
+ * @copyright  CENTUM Solutions SLU, 2016
+ * @copyright  COPYRIGHT NOTICE:
+ * This software is property of CENTUM Solutions and has been forwarded to:
+ * ............................, under the terms of contract:
+ * ............................
+ * Unauthorized duplication and disclosure to third parties is absolutely
+ * forbidden.
+ *****************************************************************************/
+
+ 
+
+_______________________________________________________________________________
+CONTENT
+-------
+
+1. Introduction
+2. Dependencies
+3. Code usage
+  3.1. Compilation flags
+4. Library API usage
+5. Application usage
+6. ToDo
+7. Known bugs
+
+_______________________________________________________________________________
+1. Introduction
+===============
+
+{Write here introduction}
+
+_______________________________________________________________________________
+2. Dependencies
+===============
+
+None
+
+_______________________________________________________________________________
+3. Code usage
+=============
+
+3.1. Compilation flags
+----------------------
+
+None
+
+_______________________________________________________________________________
+4. Library API usage
+====================
+
+None
+
+_______________________________________________________________________________
+5. Application usage
+====================
+
+None
+
+_______________________________________________________________________________
+6. ToDo
+=======
+
+- First item
+
+- Second item...
+
+_______________________________________________________________________________
+7. Known bugs
+=============
+
+- First item
+
+- Second item...
+
+
