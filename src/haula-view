@@ -1,0 +1,59 @@
+#!/bin/bash
+
+###############################################################################
+# Haula
+# Viewer
+#
+# Written by Juan Jose Castro Sotelo
+# Licensed under terms of GPLv3
+#
+###############################################################################
+
+
+
+show_help ()
+{
+  echo "\
+Usage: ${0##*/} {action} [options]
+
+Actions:
+  install [options]
+`echoind "4" "$(${THIS_SCRIPT_PWD}/myjail_installer.sh --onlyhelp)"`
+  config [options]
+`echoind "4" "$(${THIS_SCRIPT_PWD}/myjail_config.sh --onlyhelp)"`
+  uninstall [options]
+    Uninstall a jail.
+    -n, --name NAME
+      Name (alias) of the schroot jail.
+  createinst [options]
+    Create a customized and portable jail installer for a rootfs.
+    Use the same option as in 'install' action.
+  updateinst [options]
+    Update an existing customized and portable jail installer.
+    Can be updated with a new code of the installer if the version of haula has
+    been updated and/or with new data if new values are specified.
+    Use the same option as in 'install' action.
+
+General options:
+  -y, --yes
+    Automatize the procedure answering yes to all.
+  -h, --help
+    Show this information
+  -v, --version
+    Show the version number of this tool"
+}
+
+
+show_option_error()
+{
+  echoerr "\
+Bad action, option or argument. Take a look at:
+
+    $ ${0##*/} --help"
+}
+
+
+
+
+
+

@@ -1,0 +1,40 @@
+#!/bin/bash
+
+###############################################################################
+# Haula
+# Model
+#
+# Written by Juan Jose Castro Sotelo
+# Licensed under terms of GPLv3
+#
+###############################################################################
+
+
+
+write_installer()
+{
+  :
+}
+
+
+write_gojail()
+{
+  cat <<EOF > ${DESTDIR}/${GOJAILSCRIPTNAME}
+#!/bin/bash
+JAILNAME=${JAILNAME}
+EOF
+  cat <<'EOF' >> ${DESTDIR}/${GOJAILSCRIPTNAME}
+echo Entering to JAIL ${JAILNAME}...
+userNumRecommended=$((`id -u` - 1000))
+echo 
+echo !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+echo !! Do not forget to enter to the user account \'user${userNumRecommended}\' 
+echo !! Working as root is not recommended!!
+echo !!
+echo !! Run: \# su user${userNumRecommended}
+echo !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+echo
+xhost +  # Allow X clients to connect to host X server
+schroot -c ${JAILNAME} --directory=/ --user=root
+EOF
+}
