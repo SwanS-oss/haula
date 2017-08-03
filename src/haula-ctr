@@ -1,0 +1,82 @@
+#!/bin/bash
+
+###############################################################################
+# Haula
+# Controller
+#
+# Written by Juan Jose Castro Sotelo
+# Licensed under terms of GPLv3
+#
+###############################################################################
+
+
+
+do_install()
+{
+  cmd="\
+  ${THIS_SCRIPT_PWD}/myjail_installer.sh \
+    --descr \"$JAILDESC\" \
+    --destdir \"$DESTDIR\" \
+    --name \"$JAILNAME\" \
+    --osflavour \"$OSFLAVOUR\" \
+    --rootfs \"$ROOTFS\""
+  [ "$OPTYES" == true ] && cmd="$cmd --yes"
+  eval $cmd
+  
+}
+
+
+do_uninstall()
+{
+  ${THIS_SCRIPT_PWD}/myjail_installer.sh --uninstall \
+    --name "$JAILNAME"
+
+}
+
+
+do_config()
+{
+  cmd="\
+  ${THIS_SCRIPT_PWD}/myjail_config.sh \
+      --display \"$HOST_DISPLAY\" \
+      --hostname \"$JAIL_HOSTNAME\" \
+      --pkgs \"$PKG_TO_INSTALL\" \
+      --name \"$JAILNAME\" \
+      --repo2en \"$REPO_TO_ENABLE\""
+  [ "$OPTYES" == true ] && cmd="$cmd --yes"
+  eval $cmd
+
+}
+
+
+do_createinst()
+{
+  #TODO
+  tmpfile=$(mktemp /tmp/myjail_installer.XXXXXX)  # Create a temporal file in the default temporal folder of the system
+
+  # Lets do some magic for the tmpfile to be removed when this script ends, even if it crashes
+  #exec {FD_W}>"$tmpfile"  # Create file descriptor for writing, using first number available
+  #exec {FD_R}<"$tmpfile"  # Create file descriptor for reading, using first number available
+  #rm "$tmpfile"  # Delete the file, but file descriptors keep available for this script
+  
+  cp "${THIS_SCRIPT_PWD}/myjail_installer.sh" "$tmpfile"
+  
+  sed -i "\
+    s%JAILTAR=.*#%JAILTAR=\"$ROOTFS\"  #%g;\
+    s%JAILNAME=.*#%JAILNAME=\"$JAILNAME\"  #%g;\
+    s%JAILDES=.*#%JAILDES=\"$JAILDES\"  #%g;\
+    s%OSFLAVOUR=.*#%OSFLAVOUR=\"$OSFLAVOUR\"  #%g" "$tmpfile"
+  
+  return 0
+}
+
+
+do_updateinst()
+{
+  
+  
+  return 0
+}
+
+
+

@@ -1,0 +1,177 @@
+#!/bin/bash
+
+###############################################################################
+# Haula: A Linux Jail Manager
+#
+# Written by Juan Jose Castro Sotelo
+# Licensed under terms of GPLv3
+#
+# Changelog:
+# - v0.1.0:
+#   Initial version
+###############################################################################
+
+
+VERSION="0.1.0-alpha"
+
+
+
+
+###############################################################################
+# Functions
+
+getThisScriptPwd() {
+  # GLOBAL OUT:
+  #  THIS_SCRIPT_PWD
+  
+  local src
+  local path
+  
+  src="${BASH_SOURCE[0]}"
+  while [ -h "$src" ]; do # resolve $src until the file is no longer a symlink
+    path="$( cd -P "$( dirname "$src" )" && pwd )"
+    src="$(readlink "$src")"
+    [[ $src != /* ]] && src="$path/$src"
+  done
+  
+  THIS_SCRIPT_PWD="$( cd -P "$( dirname "$src" )" && pwd )"
+}; getThisScriptPwd
+
+
+
+
+###############################################################################
+# INCLUDES
+
+#. ${THIS_SCRIPT_PWD}/upvars-bash
+. ${THIS_SCRIPT_PWD}/tools-bash.0.7.0
+. ${THIS_SCRIPT_PWD}/haula-view
+. ${THIS_SCRIPT_PWD}/haula-ctr
+. ${THIS_SCRIPT_PWD}/haula-mdl
+
+
+
+
+###############################################################################
+# MAIN
+
+main()
+{
+  # Grab options
+
+  ROOTFS=""  # Path of the folder or tar.gz containing the rootfs for the jail
+  JAILNAME=""  # Name for the jail once installed. Do not use blanks or symbols
+  JAILDESC=""  # Description for the jail once installed
+  OSFLAVOUR=""  # OS type inside jail: "linux" for 64 bits or "linux32" for 32 
+
+  DESTDIR="$HOME"  # Path where the rootfs and tools of the jail will be installed
+
+  
+  if [ $# -eq 0 ]; then
+    show_help
+    exit 1
+  fi
+
+
+  SHORT_OPTS_INSTALL=":r:t:n:d:o:e:yhv"
+  LONG_OPTS_INSTALL="rootfs:,rfstype:,name:,descr:,osflavour:,destdir:,yes,help,version,onlyhelp"
+
+  SHORT_OPTS_CONFIG=":i:s:k:n:p:yhv"
+  LONG_OPTS_CONFIG="display:,hostname:,pkgs:,name:,repo2en:,yes,help,version,onlyhelp"
+
+  #SHORT_OPTS=`rmDuplic "," "${SHORT_OPTS_INSTALL}${SHORT_OPTS_CONFIG}"`
+  #LONG_OPTS=`rmDuplic "," "${LONG_OPTS_INSTALL}${LONG_OPTS_CONFIG}"`
+  SHORT_OPTS="${SHORT_OPTS_INSTALL}${SHORT_OPTS_CONFIG}"
+  LONG_OPTS="${LONG_OPTS_INSTALL},${LONG_OPTS_CONFIG}"
+  args=`getopt -o $SHORT_OPTS --long $LONG_OPTS -- "$@"`
+  if [ $? -ne 0 ]; then
+    show_option_error
+    exit 1
+  fi
+  eval set -- "$args"
+
+  while true ; do
+    case "$1" in
+      --descr | -d )    shift
+                        JAILDESC="$1"
+                        ;;
+      --destdir | -e )  shift
+                        DESTDIR="$1"
+                        ;;
+      --name | -n )     shift
+                        JAILNAME="$1"
+                        ;;
+      --osflavour | -o )
+                        shift
+                        OSFLAVOUR="$1"
+                        ;;
+      --rootfs | -r )   shift
+                        ROOTFS="$1"
+                        ;;
+
+
+
+      --display | -i )  shift
+                        HOST_DISPLAY="$1"
+                        ;;
+      --hostname | -s ) 
+                        shift
+                        JAIL_HOSTNAME="$1"
+                        ;;
+      --pkgs | -k )     shift
+                        PKG_TO_INSTALL="$1"
+                        ;;
+      --repo2en | -p )  shift
+                        REPO_TO_ENABLE="$1"
+                        ;;
+      --yes | -y )      OPTYES=true
+                        ;;
+
+
+
+
+      --help | -h )     show_help; exit 0
+                        ;;
+      --version | -v )  echo "Version $VERSION"; exit 0
+                        ;;
+      --)               shift ; break
+                        ;;
+      *)                echo "Internal error!" ; exit 1
+    esac
+    shift
+  done
+
+  if [ $# -eq 0 ]; then
+    # No action specified
+    show_help
+    exit 1
+  fi
+
+  while [ $# -ge 1 ]; do
+    case "$1" in
+      config )        do_config
+                      ;;
+      install )       do_install
+                      ;;
+      uninstall )     do_uninstall
+                      ;;
+      createinst )    do_createinst
+                      ;;
+      updateinst )    do_updateinst
+                      ;;
+      help )          show_help; exit 0
+                      ;;
+      --)             shift ; break
+                      ;;
+      *)              show_option_error
+                      exit 1
+    esac
+    shift
+  done
+
+}
+
+
+main "$@"
+
+

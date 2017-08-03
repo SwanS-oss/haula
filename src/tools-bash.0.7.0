@@ -1,0 +1,586 @@
+#!/bin/bash
+
+###############################################################################
+#
+# Generic Tools Pack for Bash v0.7.0
+# by Juan José Castro Sotelo '2017
+#
+# Licensed under terms of GPLv3. Can be distributed mentioning the author.
+#
+###############################################################################
+
+# DEPENDENCIES
+#   - upvars.sh.h
+
+
+
+
+#### Paths ###
+
+
+# NOTE!!! Paste this function inside the script!! 
+# Do not run from here!!! Or it will return this tools script path!!!
+# And uncomment the call at the end!!
+getThisScriptPwd() {
+  # GLOBAL OUT:
+  #  THIS_SCRIPT_PWD
+  
+  local src
+  local path
+  
+  src="${BASH_SOURCE[0]}"
+  while [ -h "$src" ]; do # resolve $src until the file is no longer a symlink
+    path="$( cd -P "$( dirname "$src" )" && pwd )"
+    src="$(readlink "$src")"
+    [[ $src != /* ]] && src="$path/$src"
+  done
+  
+  THIS_SCRIPT_PWD="$( cd -P "$( dirname "$src" )" && pwd )"
+}; #getThisScriptPwd  # Uncomment this call when paste to script!!!!
+
+
+
+
+#### In / Out ###
+
+
+echodbg() {
+  "$ENABLE_DBG" && echo -en "DBG:$1: $2" > /dev/tty
+}
+shopt -s expand_aliases  # enable alias expansion
+alias echodbg='echodbg ${FUNCNAME}'
+
+
+echoerr() {
+  echo "error: $@" >&2
+}
+
+
+echowarn() {
+  echo "warning: $@" >&2
+}
+
+
+shwcmd() {
+  # Execute a command showing it in the console  (emulates set -x , set +x)
+
+  echo "+ $@"   # Easier than using set -x , set +x for a single command...
+  "$@"
+
+  return $?
+  # RETURN the value returned by the command
+}
+
+
+echoind() {
+  # Print text (even multiline) indented a n number of spaces
+  local indent="$1"
+  local text="$2"
+  
+  #echo "$text" | sed 's/^/  /'
+  echo "$text" | sed "s/^/$(printf "%-${indent}s" " ")/g"
+}
+
+showDesktopNotification() {
+  notify-send --hint=int:transient:1 "$1"
+}
+
+
+isYes() {
+  echo "$1" | grep -i "^y" &> /dev/null
+  # Note: [ "$1" != "" ] && echo "$1" | $FUNCNAME || \ does not work for empty
+  # input. Tried cat, dd and read and "if then else". Nothing...
+}
+
+
+askYes() {
+  # ARGS IN:
+  local textToShow="$1"
+  local defaultOption="${2:-"y"}"  # "y" or "n"
+  
+  local output="$textToShow"
+  local option="invalid"
+  
+  while [[ ! "$option" =~ (^$|^[NnYy].*$) ]]; do
+    if [[ "$defaultOption" =~ ^[Nn].*$ ]]; then
+      echo -n "${textToShow} [yes/No]? "
+    else
+      echo -n "${textToShow} [Yes/no]? "
+    fi
+    
+    read option
+  done
+  
+  if isYes "${option}" \
+  || [[ ! "$defaultOption" =~ ^[Nn].*$ && "$option" == "" ]]; then 
+    return 0
+  else
+    return 1 
+  fi
+
+}
+
+
+doPause() {
+  # ARGS IN:
+  local textToShow="$1"
+  
+  echo -en "$textToShow"
+  read -sn 1
+}
+
+
+bytes2Human() {
+  if [ "$1" != "" ]; then echo "$1" | $FUNCNAME; else
+    awk '
+      {sum=$1}
+      END{split("B KB MB GB TB PB",type);
+         for(i=5; y<1; i--)
+             y = sum / (2^(10*i));
+
+         print y type[i+2]
+      }
+    '
+  fi
+  #RETURN the size value in the most suitable units and the units
+}
+
+
+copyArgs2Var() {
+  #TODO Probar y mejorar la llamada de este código como función (pérdida de comillas, upvars)
+  # Copy the code inside the function to the original script. Do not call funct
+
+  for i in "$@"; do
+    if [[ "$i" =~ ^-- ]]; then
+      originalArgs="$originalArgs $i"
+    else
+      i="${i//\\/\\\\}"
+      originalArgs="$originalArgs \"${i//\"/\\\"}\""  # }"
+    fi
+  done
+}
+
+
+
+
+
+#### Permissions ###
+
+
+isRoot() {
+  [ $EUID -eq 0 ]
+}
+
+
+isSudo() {
+  if [ $EUID -eq 0 ] && [ "$HOME" != "/root" ]; then
+    return 0
+  else
+    return 1
+  fi
+}
+
+
+exitIfNotRoot() {
+  if [ $EUID -ne 0 ]; then
+    echo "\
+This script must be run as root or with sudo.
+
+EXAMPLE: 
+
+    $ sudo ${0##*/}" 1>&2
+    exit 1
+  fi
+}
+
+
+exitIfNotSudo() {
+  if [ $EUID -ne 0 ]; then
+    echo "\
+This script must be run with sudo.
+
+Example: 
+
+    $ sudo ${0##*/}" 1>&2
+    exit 1
+  elif [ "$HOME" = "/root" ]; then
+    echo "\
+This script must be run with sudo from the user's account, 
+but not from the root account" 1>&2
+    exit 1
+  fi
+}
+
+
+
+
+#### Jails ###
+
+isInsideJail() {
+  # REQUIRE ROOT PROVILEGES!!!
+  # Check that the script is running inside the jail
+  if [ "$(stat -c %d:%i /)" != "$(stat -c %d:%i /proc/1/root/.)" ]; then
+    return 0
+  else
+    return 1
+  fi
+}
+
+
+
+
+#### Files ###
+
+
+isEmptyTheFile() {
+  # ARGS IN:
+  local filePath="$1"
+
+  [ ! -s "$filePath" ] && return 0 || return 1
+  # RETURN 0 if the file is empty, 1 if not
+}
+
+
+findEqualFile() {
+  # ARGS IN;
+  local path="${1:-.}"
+  local referenceFile="$2"
+  
+  findEqualFiles "$path" "$referenceFile" false
+  # RETURN_TXT the list of matching files (one per line). Empty if no file found
+  # RETURN_VAL 0 if some file found, 1 if not
+}
+
+
+findEqualFiles() {
+  # ARGS IN;
+  local path="${1:-.}"
+  local referenceFile="$2"
+  local multiFile="${3:-true}"  # true = find all files. false = stop after first match
+  
+  local referenceFileMD5=`md5sum "${referenceFile}" | awk '{print $1}'`
+  local fileToCheckName=""
+  local fileToCheckMD5=""
+  local foundFilesList=""
+  local filesToCheck="`find "${path}"`"
+
+  echodbg "Reference file MD5 is $referenceFileMD5\n"
+  
+  while read -r fileToCheck; do
+    fileToCheckMD5=`md5sum "${fileToCheck}" 2> /dev/null | awk '{print $1}'`
+    
+    echodbg "checking file \"${fileToCheck}\" (MD5: $fileToCheckMD5)\n"
+    if [ "$fileToCheckMD5" != "" ] \
+    && [ "$fileToCheckMD5" = "$referenceFileMD5" ]; then
+      echodbg "coincidence found!\n"
+      foundFilesList="${foundFilesList}`echo "$fileToCheck"`"
+      [ multiFile = false ] && break
+    fi
+  done < <(echo "$filesToCheck")
+  
+  echo "$foundFilesList"
+  [ "$foundFilesList" != "" ] && return 0 || return 1
+  # RETURN_TXT the list of matching files (one per line). Empty if no file found
+  # RETURN_VAL 0 if some file found, 1 if not
+}
+
+
+
+
+#### Data validation ###
+
+
+isInteger() {
+  if [ "$1" != "" ]; then echo "$1" | $FUNCNAME; else
+    local data=`cat`
+    
+    if [ "$data" -eq "$data" ] 2>/dev/null
+    then
+      return 0
+    else
+      return 1
+    fi
+  fi
+}
+
+
+
+
+#### Streams manipulation ###
+
+
+removeBlankLinesFromTheBeginning() {
+  if [ "$1" != "" ]; then echo "$1" | $FUNCNAME; else
+    sed '/./,$!d'
+  fi
+  # RETURN the text without blank lines at the beginning
+}
+
+
+commentAllLines() {
+  if [ "$1" != "" ]; then echo "$1" | $FUNCNAME; else
+    sed 's/^/#/g'
+  fi
+  # RETURN the text with all its lines commented out
+}
+
+
+removeCommentedLines() {
+  if [ "$1" != "" ]; then echo "$1" | $FUNCNAME; else
+    sed '/^#/d'
+  fi
+  # RETURN the text without commented lines
+}
+
+
+
+
+#### Listing ###
+
+
+folders2List() {
+  # ARG IN/OUT:
+  #  $1 $2 $3 are the name of the variables passed by reference, which will
+  #  contain the:
+  #   Files list, Names list and the Numbered list respectively
+  #  For example:
+  #   folders2List listFiles listNames listNumbered "tools" ".*" ".sh" "a1\|a2"
+  
+  [ "$1" = "" ] || [ "$2" = "" ] || [ "$3" = "" ] || [ "$4" = "" ] \
+  && { echo "${0}: ${FUNCNAME[0]}: ${LINENO}: missing arg(s)" 1>&2; return 1; }
+
+  local path="$4"
+  local filter="${5:-.*}"  # For example: ".*config$"   (use regex. Empty=all)
+  local rmvSubfix="$6"  # For example: ".config"
+  local rmvItems="${7:-$^}"  # Ex.: "item1$\|item2$"  (use regex. \|=separator)
+  
+  local listFiles=`find "${path}" -maxdepth 1 -type d -regextype posix-egrep \
+    -regex ".*/${filter}" | \
+    sed '/^\.$/d' | \
+    tail -n+2 | \
+    grep "$rmvItems" --invert-match | \
+    sort`
+  local listNames=`find "${path}" -maxdepth 1 -type d -regextype posix-egrep \
+    -regex ".*/${filter}" -exec basename {} "${rmvSubfix}" \; | \
+    sed '/^\.$/d' | \
+    tail -n+2 | \
+    grep "$rmvItems" --invert-match | \
+    sort`
+  local listNumbered=`echo "${listNames}" | nl`
+  
+  upvars -v $1 "$listFiles" -v $2 "$listNames" -v $3 "$listNumbered"
+}
+
+
+files2List() {
+  # ARG IN/OUT:
+  #  $1 $2 $3 are the name of the variables passed by reference, which will
+  #  contain the:
+  #   Files list, Names list and the Numbered list respectively
+  #  For example:
+  #   files2List listFiles listNames listNumbered "tools" ".*" ".sh" "a1\|a2"
+  
+  [ "$1" = "" ] || [ "$2" = "" ] || [ "$3" = "" ] || [ "$4" = "" ] \
+  && { echo "${0}: ${FUNCNAME[0]}: ${LINENO}: missing arg(s)" 1>&2; return 1; }
+
+  local path="$4"
+  local filter="${5:-.*}"  # For ex.: ".*\.config$"   (use regex. Empty=all)
+  local rmvSubfix="$6:-$^"  # For ex.: ".config"
+  local rmvItems="${7:-$^}"  # Ex.: "item1$\|item2$"  (use regex. \|=separator)
+  
+  local listFiles=`find "${path}" -regextype posix-egrep \
+    -regex ".*/${filter}" | \
+    sed "\%^${path}$%d" | \
+    grep "$rmvItems" --invert-match | \
+    sort`
+  local listNames=`echo "$listFiles" | \
+    sed "s%^${path}%%g" | \
+    sed "s%^/%%g" | \
+    sed "s/${rmvSubfix}//g"`
+#  local listNames=`find "${path}" -regextype posix-egrep \
+#    -regex ".*/${filter}" -exec basename {} "${rmvSubfix}" \; | \
+#    sed "\%^${path}$%d" | \
+#    grep "$rmvItems" --invert-match | \
+#    sort`
+  local listNumbered=`echo "${listNames}" | nl`
+  
+  upvars -v $1 "$listFiles" -v $2 "$listNames" -v $3 "$listNumbered"
+}
+
+
+readLine() {
+  # ARGS IN:
+  local lineNumber="$1"
+  
+  [ "$2" != "" ] \
+  && echo "$2" | $FUNCNAME "$1" || \
+  sed "${lineNumber}!d"
+  # return the read line
+}
+
+
+readOpt() {
+  # ARGS IN:
+  local optNumber="$1"
+  
+  [ "$2" != "" ] \
+  && echo "$2" | $FUNCNAME "$1" || \
+  readLine "$1"
+  # return the read option
+}
+
+
+rmDuplic() {
+  # Remove duplicate items from a list of x-separated elements 
+  # The separator can be a comma, a space, etc
+  local separator="$1"
+
+  [ "$2" != "" ] \
+  && echo "$2" | $FUNCNAME "$1" || \
+  awk 'BEGIN{RS=ORS=","} !seen[$0]++' | head -n 1
+}
+
+
+rmDuplicLines() {
+  # Remove duplicate items from a list of one element per line 
+
+  [ "$1" != "" ] \
+  && echo "$1" | $FUNCNAME || \
+  awk '!seen[$0]++'
+}
+
+
+
+
+#### Sections ###
+
+
+addFileSection() {
+  # Add a delimited section with content to a file
+  
+  local sectionName="$1"
+  local content="$2"
+  local filePath="$3"
+  
+  eval filePath="$filePath"  # To expand ~
+  
+  echo    "# $sectionName BEGIN" >> "$filePath" \
+  && echo "$content" >> "$filePath" \
+  && echo "# $sectionName END" >> "$filePath" \
+  && return 0 || return 1
+
+}
+
+
+removeFileSection() {
+  # Remove delimited section from a file (and the empty line before, if exists)
+
+  # ARGS IN:
+  local sectionName="$1"
+  local filePath="$2"
+  
+  eval filePath="$filePath"  # To expand ~
+
+  sed -i "/^[ \t]*$/{: a;N;/# ${sectionName} BEGIN/!P;D;/^[ \t]*$/b a}\
+;/\# ${sectionName} BEGIN/,/# ${sectionName} END/d" ${filePath} \
+  && return 0 || return 1
+  
+  # SED COMMANDS EXPLANATION:
+  # - First search for a line that starts and finishes only by blanks or tabs 
+  #   or nothing (i.e. empty line). We will call it L1
+  # 
+  # Inside brackets (block of commands): 
+  # - Create label a
+  # - Append the next line of input into the pattern space. We will call it L2.
+  # - If L2 does NOT matches the string "# ${sectionName} BEGIN" (!) then
+  #   P = Print the first embedded newline (L1) of the current pattern space.
+  #   Note that if L2 matched, the empty line (L1) will have been deleted from 
+  #   file.
+  # - D = Delete the first embedded newline in the pattern space and start next 
+  #   cycle, but skip reading from the input if there is still data in the 
+  #   pattern space.
+  # - L2 keeps on pattern space and now it's the new L1
+  # - If this new L1 is a line that starts and finishes only by blanks or tabs 
+  #   or nothing (i.e. empty line), repeat loop from label a.
+  # - Finally remove all the lines from "# ${sectionName} BEGIN" to 
+  #   "# ${sectionName} END"
+}
+
+
+removeTxtSection() {
+  # Remove delimited section from a text (and the empty line before, if exists)
+
+  #ARGS IN:
+  local sectionName="$1"
+  local origTxt="$2"
+
+  local modifTxt="`echo "$origTxt" \
+  | sed "/^[ \t]*$/{: a;N;/# ${sectionName} BEGIN/!P;D;/^[ \t]*$/b a}\
+;/\# ${sectionName} BEGIN/,/# ${sectionName} END/d"`"
+
+  echo "$modifTxt"
+  # RETURN Text without the section specified
+}
+
+
+fileSectionExists() {
+  # ARGS IN:
+  local sectionName="$1"
+  local filePath="$2"
+  
+  eval filePath="$filePath"  # To expand ~
+
+  if grep "^# $sectionName BEGIN$" "$filePath" > /dev/null; then
+    return 0
+  else 
+    return 1
+  fi
+}
+
+
+
+
+#### Networking ###
+
+
+string2dnsqname() {
+  # Receive a domain name (www.google.es) and converts it to DNS qname format
+  # (|03|www|06|google|02|es|00|)
+
+  # ARGS IN:
+  local name="$1"
+  
+  local qname=""
+  local name_part=""
+  local name_tmp="`echo "$name" | sed 's/\./ /g'`"
+
+  for name_part in $name_tmp; do
+    qname="${qname}|`printf "%02d" ${#name_part}`|${name_part}"
+  done
+  qname="${qname}|00|"
+  
+  echo "$qname"
+  # RETURN the DNS qname (for instance, |03|www|06|google|02|es|00|)
+}
+
+
+
+
+#### Others ###
+
+
+randomTmpFile() {
+  # ARGS IN:
+  local filenamePrefix="$1"
+  local filenameSufix="$2"
+  
+  local TMP_DIR="${$TMPDIR:/tmp}"  # According to POSIX/FHS
+  local rndStr="`cat /dev/urandom | tr -dc _A-Z-a-z-0-9 | head -c${1:-12}`"
+  
+  local rndFilename="${filenamePrefix}${rndStr}${filenameSufix}"
+  
+  echo "${TMP_DIR}/${rndFilename}"
+  # RETURN The full file path (dir and filename)
+}
+
+
