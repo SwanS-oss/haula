@@ -126,9 +126,9 @@ askYes()
   
   while [[ ! "$option" =~ (^$|^[NnYy].*$) ]]; do
     if [[ "$defaultOption" =~ ^[Nn].*$ ]]; then
-      echo -n "${textToShow} [yes/No]? "
+      echo -n "${textToShow} [yes/No]: "
     else
-      echo -n "${textToShow} [Yes/no]? "
+      echo -n "${textToShow} [Yes/no]: "
     fi
     
     read option
