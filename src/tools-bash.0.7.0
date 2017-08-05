@@ -242,6 +242,21 @@ isEmptyTheFile() {
 }
 
 
+isFileEmpty() {
+  # Use this function instead of isEmptyTheFile()
+  isEmptyTheFile "$1"
+}
+
+
+isDirEmpty() {
+  # ARGS IN:
+  local dirPath="$1"
+
+  [ -z "$(ls -A "$dirPath" 2> /dev/null)" ] && return 0 || return 1
+  # RETURN 0 if the file is empty, 1 if not
+}
+
+
 findEqualFile() {
   # ARGS IN;
   local path="${1:-.}"
