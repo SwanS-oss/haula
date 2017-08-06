@@ -349,6 +349,17 @@ removeCommentedLines() {
 }
 
 
+lineExists() {
+  # ARGS IN:
+  local lineText="$1"
+  
+  [ "$2" != "" ] \
+  && echo "$2" | $FUNCNAME "$1" || \
+  grep -Fxq "$lineText" &> /dev/null
+  # RETURN 0 if line found, 1 if not fount
+}
+
+
 
 
 #### Listing ###
