@@ -1,0 +1,286 @@
+#!/bin/bash
+
+###############################################################################
+# Haula
+# Installer
+#
+# Using Simple_Installer_Template v1.0.0 by Juan Jose Castro Sotelo
+# Licensed under terms of GPLv3
+#
+###############################################################################
+
+
+
+# ====== INCLUDES ======
+
+. install.config  # Modify this file to customize the installer for an app
+. tools-bash.0.7.0
+
+
+
+# ====== VIEW FUNCTIONS ======
+
+show_help()
+{
+  echo "\
+Usage: ${0##*/} <options>
+
+Install the application '$APPNAME' in the operating system.
+[options]
+  -d, --destdir DIR
+    Target directory where the application will be installed
+    Default: $DESTDIR_DFL
+  -r, --rootdir DIR
+    Set the root path of the operating system file system.
+    Useful for .deb building, jails, etc. For example, /etc/environment will be 
+    searched in {DIR}/etc/environment
+    Default: ${ROOTDIR_DFL:-/}
+  -u, --uninstall
+    Uninstall the application from the operating system.
+  -h, --help
+    Show this information"
+}
+
+
+show_option_error()
+{
+  echo "\
+Bad action, option or argument. Take a look at:
+
+    $ ${0##*/} --help" >&2
+}
+
+
+
+# ====== INSTALLATION/UNINSTALLATION FUNCTIONS ======
+
+do_install()
+{
+  local success=true
+  ROOTDIR="${ROOTDIR:-$ROOTDIR_DFL}"
+  DESTDIR="${DESTDIR:-$DESTDIR_DFL}"
+  
+  [ "$ROOTDIR" != "" ] && ROOTDIR="${ROOTDIR}/"  # Get sure ROOTDIR ends with /
+  
+  if ! askYes "This will install '$APPNAME' in '${ROOTDIR}$DESTDIR'. Continue?"
+  then
+    echo "Cancelled!"
+    exit 2
+  fi
+  
+  
+  # ====== STANDARD APP FILES INSTALLATION ======
+  # Do not touch this section to adapt the installer to a new app
+  
+  # Copying files to the target installation path
+  echo "Copying files of app '${APPNAME}' in ${ROOTDIR}${DESTDIR}..."
+  mkdir -p "${ROOTDIR}${DESTDIR}" && success=true || success=false
+  for ((i=0; i<${#FILES_LIST[*]} && $success == true; i++)) do
+    read filename mode < <(IFS=":"; echo ${FILES_LIST[$i]})
+    install -v --mode=$mode $filename "${ROOTDIR}${DESTDIR}" || success=false
+  done
+
+  if [ "$success" == false ]; then
+    echo "Error installing files!" >&2
+    exit 1
+  fi
+  
+  # Adding app to system path
+  echo "Adding app '${APPNAME}' to system path..."
+  echo "PATH=${DESTDIR}:\$PATH" > "${ROOTDIR}/etc/profile.d/${APPNAME}.sh" \
+  && success=true || success=false
+  
+  if [ "$success" == false ]; then
+    echo "Error configuring system path!" >&2
+    exit 1
+  fi
+  
+  # Adding app to system path for execution in Bash Subsystem for Windows
+  # Workaround needed because Bash in Windows is not loading profile.d scripts
+  if [ "$ROOTDIR" == "" ] && grep -q Microsoft /proc/version; then
+    echo "Bash for Windows detected: modifying PATH for user..."
+    if ! cat "${HOME}/.bashrc" | lineExists "PATH=${DESTDIR}:\$PATH"; then
+      echo "PATH=${DESTDIR}:\$PATH" >> "${HOME}/.bashrc" \
+      && success=true || success=false
+    else
+      echo "PATH already contained app '${APPNAME}'"
+    fi
+  fi
+  
+  if [ "$success" == false ]; then
+    echo "Error configuring system path for Bash subsystem in Windows!" >&2
+    exit 1
+  fi
+  
+ 
+  # ====== SPECIFIC APP EXTRA ACTIONS ======
+  # Write below the code for other needed actions than copying files
+  
+  # Write code here if needed
+
+
+  # ====== MESSAGE FOR INSTALLATION ENDING ======
+  
+  echo "\
+Success installing '$APPNAME'"
+
+  [ "$ROOTDIR" == "" ] && echo "\
+Log-out and log-in in the terminal to use '$APPNAME' from any location."
+}
+
+
+do_uninstall()
+{
+  local success=true
+  
+  ROOTDIR="${ROOTDIR:-$ROOTDIR_DFL}"
+
+  [ "$ROOTDIR" != "" ] && ROOTDIR="${ROOTDIR}/"  # Get sure ROOTDIR ends with /
+
+  if [ "$DESTDIR" == "" ]; then
+    whichpath="`which ${APPNAME}`"
+  fi
+
+  if [ "$whichpath" != "" ]; then
+    DESTDIR="$whichpath"
+  else
+    DESTDIR="$DESTDIR_DFL"
+  fi
+  
+  if [ ! -d "${ROOTDIR}${DESTDIR}" ]; then
+    echo "Error: App '$APPNAME' not installed" >&2
+    exit 1
+  fi
+  
+  if ! askYes "This will remove '$APPNAME' in '${ROOTDIR}${DESTDIR}'. Continue?"
+  then
+    echo "Cancelled!"
+    exit 2
+  fi
+  
+
+  # ====== STANDARD APP FILES UNINSTALLATION ======
+  # Do not touch this section to adapt the installer to a new app. Use 
+  # install.config 
+  
+  # Removing files from the target installation path
+  echo "Removing files of '${APPNAME}' from ${ROOTDIR}${DESTDIR}..."
+  for ((i=0; i<${#FILES_LIST[*]} && $success == true; i++)) do
+    read filename mode < <(IFS=":"; echo ${FILES_LIST[$i]})
+    rm -vf "${ROOTDIR}${DESTDIR}/${filename}" || success=false
+  done
+  
+  if [ "$success" == false ]; then
+    echo "Error uninstalling files!" >&2
+    exit 1
+  fi
+  
+  # Removing application directory
+  if ! isDirEmpty "${ROOTDIR}${DESTDIR}/"; then
+    if askYes "Directory '${ROOTDIR}${DESTDIR}' is not empty. Remove it?" y
+    then
+      echo "Removing application directory '${ROOTDIR}${DESTDIR}'..."
+      rmdir -v "${ROOTDIR}${DESTDIR}/" && success=true || success=false
+    fi
+  else
+    echo "Removing application directory '${ROOTDIR}${DESTDIR}'..."
+    rmdir -v "${ROOTDIR}${DESTDIR}/" && success=true || success=false
+  fi
+  
+  if [ "$success" == false ]; then
+    echo "Error removing application directory!" >&2
+    exit 1
+  fi
+  
+  # Removing app from system path
+  echo "Removing app '${APPNAME}' from system path..."
+  rm -vf "${ROOTDIR}/etc/profile.d/${APPNAME}.sh" \
+  && success=true || success=false
+  
+  if [ "$success" == false ]; then
+    echo "Error configuring system path!" >&2
+    exit 1
+  fi
+  
+  # Removing app from system path for execution in Bash Subsystem for Windows
+  # Workaround needed because Bash in Windows is not loading profile.d scripts
+  if [ "$ROOTDIR" == "" ] && grep -q Microsoft /proc/version; then
+    echo "Bash for Windows detected: modifying PATH for user..."
+    sed -i "\%^PATH=${DESTDIR}:.*%d" "${HOME}/.bashrc" \
+    && success=true || success=false
+  fi
+  
+  if [ "$success" == false ]; then
+    echo "Error configuring system path for Bash subsystem in Windows!" >&2
+    exit 1
+  fi
+
+
+  # ====== SPECIFIC APP EXTRA ACTIONS ======
+  # Write in install.config the code for other needed actions than copying files
+  
+  EXTRA_ACTIONS
+
+
+  # ====== MESSAGE FOR INSTALLATION ENDING ======
+  
+  echo "\
+Success uninstalling '$APPNAME'"
+
+}
+
+
+
+# ====== MAIN FUNCTION ======
+
+main()
+{
+  DESTDIR=""
+  ROOTDIR=""
+  OPTUNINSTALL=false
+  
+  
+  SHORT_OPTS=":d:r:uh"
+  LONG_OPTS="destdir:,root:,uninstall,help"
+  args=`getopt -o $SHORT_OPTS --long $LONG_OPTS -- "$@"`
+  if [ $? -ne 0 ]; then
+    show_option_error
+    exit 1
+  fi
+  eval set -- "$args"
+
+
+  while true ; do
+    case "$1" in
+      --destdir | -d )  shift
+                        DESTDIR="$1"
+                        ;;
+      --rootdir | -r )  shift
+                        ROOTDIR="$1"
+                        ;;
+      --uninstall | -u ) 
+                        OPTUNINSTALL=true
+                        ;;
+      --help | -h )     show_help; exit 0
+                        ;;
+      --)               shift ; break
+                        ;;
+      *)                echo "Internal error ($1)!" ; exit 1
+    esac
+    shift
+  done
+
+
+  exitIfNotRoot
+
+  if [ "$OPTUNINSTALL" == true ]; then
+    do_uninstall
+  else
+    do_install
+  fi
+
+}
+
+
+main "$@"
+
