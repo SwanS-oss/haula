@@ -48,6 +48,7 @@ JAILRFSTYPE=""  # Specify the rootfs type (raw, tar or targz). Empty for automat
 
 DESTDIR_DFL=$HOME  # Path where the rootfs and tools of the jail will be installed
 
+OPTUNINSTALL=false
 OPTYES=false
 
 declare -A DEBOOTSTRAP_REPOURL
@@ -126,6 +127,8 @@ Install a Linux rootfs inside a schroot jail.
     If not specified, the 'rootfs' parent folder will be used when rootfs type
     is raw (directory). When rootfs type is tar, targz or debootstrap, it 
     defaults to: $DESTDIR_DFL
+  -u, --uninstall
+    Uninstall a previously installed jail. Specify the jail name with --name.
   -h, --help
     Show this information
   -v, --version
@@ -462,8 +465,8 @@ main ()
   ##################################################
   # Input arguments
 
-  SHORT_OPTS=":r:t:n:d:o:e:yhv"
-  LONG_OPTS="rootfs:,rfstype:,name:,descr:,osflavour:,destdir:,yes,help,version,onlyhelp"
+  SHORT_OPTS=":r:t:n:d:o:e:uyhv"
+  LONG_OPTS="rootfs:,rfstype:,name:,descr:,osflavour:,destdir:,uninstall,yes,help,version,onlyhelp"
   args=`getopt -o $SHORT_OPTS --long $LONG_OPTS -- "$@"`
   if [ $? -ne 0 ]; then
     show_option_error
@@ -490,6 +493,9 @@ main ()
                               ;;
       -e | --destdir )        shift
                               DESTDIR="$1"
+                              ;;
+      -u | --uninstall )      OPTUNINSTALL=true
+                              echo "Feature not implemented yet"; exit 1
                               ;;
       -y | --yes )            OPTYES=true
                               ;;
