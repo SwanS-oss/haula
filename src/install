@@ -27,9 +27,9 @@ Usage: ${0##*/} <options>
 
 Install the application '$APPNAME' in the operating system.
 [options]
-  -d, --destdir DIR
+  -d, --instdir DIR
     Target directory where the application will be installed
-    Default: $DESTDIR_DFL
+    Default: $INSTDIR_DFL
   -r, --rootdir DIR
     Set the root path of the operating system file system.
     Useful for .deb building, jails, etc. For example, /etc/environment will be 
@@ -56,67 +56,98 @@ Bad action, option or argument. Take a look at:
 
 do_install()
 {
+  # DO NOT TOUCH this function to adapt the installer to a new app.
+  # Use install.config instead to customize
+
   local success=true
+
   ROOTDIR="${ROOTDIR:-$ROOTDIR_DFL}"
-  DESTDIR="${DESTDIR:-$DESTDIR_DFL}"
+  INSTDIR="${INSTDIR:-$INSTDIR_DFL}"
+  BINDIR="${BINDIR:-$BINDIR_DFL}"
+  LIBDIR="${LIBDIR:-$LIBDIR_DFL}"
+  KMODDIR="${KMODDIR:-$KMODDIR_DFL}"
+  KRELEASE="${KRELEASE:-$KRELEASE_DFL}"
   
-  [ "$ROOTDIR" != "" ] && ROOTDIR="${ROOTDIR}/"  # Get sure ROOTDIR ends with /
+  # Get sure ROOTDIR ends with / (note that in POSIX double / is not a problem)
+  [[ "$ROOTDIR" != "" && ! "$ROOTDIR" =~ /$ ]] && ROOTDIR="${ROOTDIR}/"
   
-  if ! askYes "This will install '$APPNAME' in '${ROOTDIR}$DESTDIR'. Continue?"
+  targetdir="`echo "${ROOTDIR}${INSTDIR}" | rmDuplicatedForwardSlashesInPath`"
+
+  if [ "$OPTUNATTENDED" == false ] \
+  && ! askYes "This will install '$APPNAME' in '${targetdir}'. Continue?"
   then
-    echo "Cancelled!"
+    echo "\
+Cancelled!"
     exit 2
   fi
+
+
+  # SPECIFIC APP EXTRA ACTIONS
+  # Write in install.config the code for other needed checkings and preparations
+  CUSTOM_ACTIONS_PREINSTALL
   
   
-  # ====== STANDARD APP FILES INSTALLATION ======
-  # Do not touch this section to adapt the installer to a new app
-  
-  # Copying files to the target installation path
-  echo "Copying files of app '${APPNAME}' in ${ROOTDIR}${DESTDIR}..."
-  mkdir -p "${ROOTDIR}${DESTDIR}" && success=true || success=false
+  echo "\
+Installing app '${APPNAME}' in ${targetdir}..."
+
+  mkdir -p "${targetdir}" \
+  && success=true || success=false
+
+  # INSTALLATION OF EVERY FILE IF LIST "FILES_LIST"
   for ((i=0; i<${#FILES_LIST[*]} && $success == true; i++)) do
-    read filename mode < <(IFS=":"; echo ${FILES_LIST[$i]})
-    install -v --mode=$mode $filename "${ROOTDIR}${DESTDIR}" || success=false
+    read filename mode autosymlink symlinks_list < <(local IFS=":"; echo ${FILES_LIST[$i]})
+    
+    # Copying file to the target installation path with defined permissions
+    install -v --mode=$mode "$filename" "${targetdir}" \
+    && success=true || success=false
+    
+    # Create automatic symbolic link to file if enabled
+    if [ "$success" == true -a "$autosymlink" == "y" ]; then
+      if [[ $filename =~ \.so$ ]]; then
+        symlink="$LIBDIR/${filename}"
+        #TODO Create a symlink for every version of .so (E.g.: .so.1.2.3)
+      elif [[ $filename =~ \.ko$ ]]; then
+        symlink="${KMODDIR}${KRELEASE}/${filename}"
+      elif [ $(( ($mode / 100) & 2#001 )) == "1" ]; then
+        # File is executable for the owner user
+        symlink="${BINDIR}/${filename}"
+      fi
+      
+      [ "$success" == true ] \
+      && echo "\
+Creating symlink '$symlink' => '${targetdir}/${filename}'..." \
+      && mkdir -p "`dirname "$symlink"`" \
+      && ln -fs "${targetdir}/${filename}" "$symlink" \
+      && success=true || success=false
+    fi
+    
+    # Create custom symbolic links to file if specified in FILES_LIST
+    if [ "$success" == true -a "$symlinks_list" != "" ]; then
+      preIFS=$IFS; IFS=","
+      for symlink in $symlinks_list; do
+        [ "$success" == true ] \
+        && echo "\
+Creating symlink '$symlink' => '${targetdir}/${filename}'..." \
+        && mkdir -p "`dirname "$symlink"`" \
+        && ln -fs "${targetdir}/${filename}" "$symlink" \
+        && success=true || success=false
+      done
+      IFS=$preIFS
+    fi
   done
 
   if [ "$success" == false ]; then
-    echo "Error installing files!" >&2
+    echo "\
+Error installing files!" >&2
     exit 1
   fi
   
-  # Adding app to system path
-  echo "Adding app '${APPNAME}' to system path..."
-  echo "PATH=${DESTDIR}:\$PATH" > "${ROOTDIR}/etc/profile.d/${APPNAME}.sh" \
-  && success=true || success=false
+  #addToSystemPath
   
-  if [ "$success" == false ]; then
-    echo "Error configuring system path!" >&2
-    exit 1
-  fi
   
-  # Adding app to system path for execution in Bash Subsystem for Windows
-  # Workaround needed because Bash in Windows is not loading profile.d scripts
-  if [ "$ROOTDIR" == "" ] && grep -q Microsoft /proc/version; then
-    echo "Bash for Windows detected: modifying PATH for user..."
-    if ! cat "${HOME}/.bashrc" | lineExists "PATH=${DESTDIR}:\$PATH"; then
-      echo "PATH=${DESTDIR}:\$PATH" >> "${HOME}/.bashrc" \
-      && success=true || success=false
-    else
-      echo "PATH already contained app '${APPNAME}'"
-    fi
-  fi
-  
-  if [ "$success" == false ]; then
-    echo "Error configuring system path for Bash subsystem in Windows!" >&2
-    exit 1
-  fi
-  
- 
-  # ====== SPECIFIC APP EXTRA ACTIONS ======
-  # Write below the code for other needed actions than copying files
-  
-  # Write code here if needed
+  # SPECIFIC APP EXTRA ACTIONS
+  # Write in install.config the code for other needed actions than copying files
+  CUSTOM_ACTIONS_POSTINSTALL
 
 
   # ====== MESSAGE FOR INSTALLATION ENDING ======
@@ -131,95 +162,140 @@ Log-out and log-in in the terminal to use '$APPNAME' from any location."
 
 do_uninstall()
 {
+  # DO NOT TOUCH this function to adapt the installer to a new app.
+  # Use install.config instead to customize
+
   local success=true
   
   ROOTDIR="${ROOTDIR:-$ROOTDIR_DFL}"
+  BINDIR="${BINDIR:-$BINDIR_DFL}"
+  LIBDIR="${LIBDIR:-$LIBDIR_DFL}"
+  KMODDIR="${KMODDIR:-$KMODDIR_DFL}"
+  KRELEASE="${KRELEASE:-$KRELEASE_DFL}"
 
-  [ "$ROOTDIR" != "" ] && ROOTDIR="${ROOTDIR}/"  # Get sure ROOTDIR ends with /
+  # Get sure ROOTDIR ends with / (note that in POSIX double / is not a problem)
+  [[ "$ROOTDIR" != "" && ! "$ROOTDIR" =~ /$ ]] && ROOTDIR="${ROOTDIR}/"
+  [ "$ROOTDIR" == "/" ] && ROOTDIR=""
 
-  if [ "$DESTDIR" == "" ]; then
+  # Get the application installation path
+  # Note: Duplicated forward slashes are removed for cosmetic reasons
+  if [ "$INSTDIR" == "" ]; then
     whichpath="`which ${APPNAME}`"
   fi
 
   if [ "$whichpath" != "" ]; then
-    DESTDIR="$whichpath"
+    INSTDIR="`resolveSymlink "$whichpath" | xargs dirname`"
   else
-    DESTDIR="$DESTDIR_DFL"
+    INSTDIR="$INSTDIR_DFL"
   fi
   
-  if [ ! -d "${ROOTDIR}${DESTDIR}" ]; then
-    echo "Error: App '$APPNAME' not installed" >&2
+  targetdir="`echo "${ROOTDIR}${INSTDIR}" | rmDuplicatedForwardSlashesInPath`"
+
+  # Checkings prior starting uninstalling
+  if [ ! -d "${targetdir}" ]; then
+    echo "\
+Error: App '$APPNAME' not installed (path: ${targetdir})" >&2
     exit 1
   fi
   
-  if ! askYes "This will remove '$APPNAME' in '${ROOTDIR}${DESTDIR}'. Continue?"
+  if [ "$OPTUNATTENDED" == false ] \
+  && ! askYes "This will uninstall '$APPNAME' in '${targetdir}'. Continue?"
   then
     echo "Cancelled!"
     exit 2
   fi
   
+  
+  # SPECIFIC APP EXTRA ACTIONS
+  # Write in install.config the code for other needed checkings and preparations
+  CUSTOM_ACTIONS_PREUNINSTALL
 
-  # ====== STANDARD APP FILES UNINSTALLATION ======
-  # Do not touch this section to adapt the installer to a new app. Use 
-  # install.config 
-  
-  # Removing files from the target installation path
-  echo "Removing files of '${APPNAME}' from ${ROOTDIR}${DESTDIR}..."
+
+  echo "\
+Uninstalling '${APPNAME}' from '${targetdir}'..."
+
+  # UNINSTALLATION OF EVERY FILE IF LIST "FILES_LIST"
   for ((i=0; i<${#FILES_LIST[*]} && $success == true; i++)) do
-    read filename mode < <(IFS=":"; echo ${FILES_LIST[$i]})
-    rm -vf "${ROOTDIR}${DESTDIR}/${filename}" || success=false
+    read filename mode autosymlink symlinks_list < <(local IFS=":"; echo ${FILES_LIST[$i]})
+    
+    # Remove automatically created symbolic link to file
+    if [ "$success" == true -a "$autosymlink" == "y" ]; then
+      if [[ $filename =~ \.so$ ]]; then
+        symlink="$LIBDIR/${filename}"
+        #TODO Create a symlink for every version of .so (E.g.: .so.1.2.3)
+      elif [[ $filename =~ \.ko$ ]]; then
+        symlink="${KMODDIR}${KRELEASE}/${filename}"
+      elif [ $(( ($mode / 100) & 2#001 )) == "1" ]; then
+        # File is executable for the owner user
+        symlink="${BINDIR}/${filename}"
+      fi
+      
+      [ "$success" == true ] \
+      && echo "\
+Removing symlink '$symlink' => '${targetdir}/${filename}'..." \
+      && rm -vf "$symlink" \
+      && success=true || success=false
+    fi
+    
+    # Remove custom symbolic links to file as specified in FILES_LIST
+    if [ "$success" == true -a "$symlinks_list" != "" ]; then
+      preIFS=$IFS; IFS=","
+      for symlink in $symlinks_list; do
+        [ "$success" == true ] \
+        && echo "\
+Removing symlink '$symlink'=>'${targetdir}/${filename}'..." \
+        && rm -vf "$symlink" \
+        && success=true || success=false
+      done
+      IFS=$preIFS
+    fi
+
+    if [ "$success" == false ]; then
+      echo "\
+Error removing symlink!" >&2
+      exit 1
+    fi
+  
+    # Remove file from installation directory
+    if [ "$success" == true ]; then
+      rm -vf "${targetdir}/${filename}" \
+      && success=true || success=false
+    fi
+    
+    if [ "$success" == false ]; then
+      echo "\
+Error removing file from installation directory!" >&2
+      exit 1
+    fi
   done
-  
-  if [ "$success" == false ]; then
-    echo "Error uninstalling files!" >&2
-    exit 1
-  fi
-  
+
   # Removing application directory
-  if ! isDirEmpty "${ROOTDIR}${DESTDIR}/"; then
-    if askYes "Directory '${ROOTDIR}${DESTDIR}' is not empty. Remove it?" y
+  if ! isDirEmpty "${targetdir}/"; then
+    if [ "$OPTUNATTENDED" == false ] \
+    && askYes "Directory '${targetdir}' is not empty. Remove it?" n
     then
-      echo "Removing application directory '${ROOTDIR}${DESTDIR}'..."
-      rmdir -v "${ROOTDIR}${DESTDIR}/" && success=true || success=false
+#      echo "\
+#Removing application directory '${targetdir}'..."
+      rm -vR "${targetdir}/" && success=true || success=false
     fi
   else
-    echo "Removing application directory '${ROOTDIR}${DESTDIR}'..."
-    rmdir -v "${ROOTDIR}${DESTDIR}/" && success=true || success=false
+#    echo "\
+#Removing application directory '${targetdir}'..."
+    rmdir -v "${targetdir}/" && success=true || success=false
   fi
   
   if [ "$success" == false ]; then
-    echo "Error removing application directory!" >&2
+    echo "\
+Error removing application directory!" >&2
     exit 1
   fi
   
-  # Removing app from system path
-  echo "Removing app '${APPNAME}' from system path..."
-  rm -vf "${ROOTDIR}/etc/profile.d/${APPNAME}.sh" \
-  && success=true || success=false
+  #rmFromSystemPath
   
-  if [ "$success" == false ]; then
-    echo "Error configuring system path!" >&2
-    exit 1
-  fi
-  
-  # Removing app from system path for execution in Bash Subsystem for Windows
-  # Workaround needed because Bash in Windows is not loading profile.d scripts
-  if [ "$ROOTDIR" == "" ] && grep -q Microsoft /proc/version; then
-    echo "Bash for Windows detected: modifying PATH for user..."
-    sed -i "\%^PATH=${DESTDIR}:.*%d" "${HOME}/.bashrc" \
-    && success=true || success=false
-  fi
-  
-  if [ "$success" == false ]; then
-    echo "Error configuring system path for Bash subsystem in Windows!" >&2
-    exit 1
-  fi
 
-
-  # ====== SPECIFIC APP EXTRA ACTIONS ======
+  # SPECIFIC APP EXTRA ACTIONS
   # Write in install.config the code for other needed actions than copying files
-  
-  EXTRA_ACTIONS
+  CUSTOM_ACTIONS_POSTUNINSTALL
 
 
   # ====== MESSAGE FOR INSTALLATION ENDING ======
@@ -235,13 +311,18 @@ Success uninstalling '$APPNAME'"
 
 main()
 {
-  DESTDIR=""
+  INSTDIR=""
   ROOTDIR=""
+  BINDIR=""
+  LIBDIR=""
+  KMODDIR=""
+  KRELEASE=""
   OPTUNINSTALL=false
+  OPTUNATTENDED=false
   
   
   SHORT_OPTS=":d:r:uh"
-  LONG_OPTS="destdir:,root:,uninstall,help"
+  LONG_OPTS="instdir:,root:,bindir:,libdir:,kmoddir:,krelease:,unattended,uninstall,help"
   args=`getopt -o $SHORT_OPTS --long $LONG_OPTS -- "$@"`
   if [ $? -ne 0 ]; then
     show_option_error
@@ -252,14 +333,29 @@ main()
 
   while true ; do
     case "$1" in
-      --destdir | -d )  shift
-                        DESTDIR="$1"
+      --instdir | -d )  shift
+                        INSTDIR="$1"
                         ;;
       --rootdir | -r )  shift
                         ROOTDIR="$1"
                         ;;
+      --bindir | -b )   shift
+                        BINDIR="$1"
+                        ;;
+      --libdir | -l )   shift
+                        LIBDIR="$1"
+                        ;;
+      --kmoddir | -m )  shift
+                        KMODDIR="$1"
+                        ;;
+      --krelease | -k ) shift
+                        KRELEASE="$1"
+                        ;;
       --uninstall | -u ) 
                         OPTUNINSTALL=true
+                        ;;
+      --unattended | -a ) 
+                        OPTUNATTENDED=true
                         ;;
       --help | -h )     show_help; exit 0
                         ;;

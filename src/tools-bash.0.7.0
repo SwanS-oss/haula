@@ -20,7 +20,7 @@
 
 # NOTE!!! Paste this function inside the script!! 
 # Do not run from here!!! Or it will return this tools script path!!!
-# And uncomment the call at the end!!
+# And uncomment the call at the end.
 getThisScriptPwd() {
   # GLOBAL OUT:
   #  THIS_SCRIPT_PWD
@@ -36,7 +36,7 @@ getThisScriptPwd() {
   done
   
   THIS_SCRIPT_PWD="$( cd -P "$( dirname "$src" )" && pwd )"
-}; #getThisScriptPwd  # Uncomment this call when paste to script!!!!
+}; #getThisScriptPwd  # UNCOMMENT this call when paste to script
 
 
 
@@ -164,7 +164,6 @@ copyArgs2Var() {
 
 
 
-
 #### Permissions ###
 
 
@@ -217,6 +216,7 @@ but not from the root account" 1>&2
 
 #### Jails ###
 
+
 isInsideJail() {
   # REQUIRE ROOT PROVILEGES!!!
   # Check that the script is running inside the jail
@@ -232,6 +232,27 @@ isInsideJail() {
 
 #### Files ###
 
+
+resolveSymlink() {
+  local src="$1"  # Path to file thich could be a symlink to resolve
+  local path
+  
+  while [ -h "$src" ]; do # resolve $src until the file is no longer a symlink
+    path="$( cd -P "$( dirname "$src" )" && pwd )"
+    src="$(readlink "$src")"
+    [[ $src != /* ]] && src="$path/$src"
+  done
+  
+  echo $src
+}
+
+
+rmDuplicatedForwardSlashesInPath() {
+  if [ "$1" != "" ]; then echo "$1" | $FUNCNAME; else
+    sed 's%//*%/%g'
+  fi
+  # RETURN the path without dupñicated forward slashes
+}
 
 isEmptyTheFile() {
   # ARGS IN:
@@ -588,6 +609,107 @@ string2dnsqname() {
   
   echo "$qname"
   # RETURN the DNS qname (for instance, |03|www|06|google|02|es|00|)
+}
+
+
+
+
+#### System version detection ###
+
+
+isBashForWindows() {
+  grep -q Microsoft /proc/version
+}
+
+
+
+
+#### System configuration ###
+
+
+addToSystemWidePATH() {
+  #TODO: Not tested yet
+  
+  local pathToBeAdded="$1"
+  local rootdir="$2"  # Optional. Useful for jail or .deb creation
+  
+  if ! cat "${rootdir}/etc/profile.d/toolsbashlib_add2path.sh" 2>/dev/null \
+  | lineExists "PATH=${pathToBeAdded}:\$PATH"
+  then
+    echo "PATH=${pathToBeAdded}:\$PATH" \
+    >> "${rootdir}/etc/profile.d/bt_add2path.sh" \
+    && return 0 || return 1
+  fi
+}
+
+
+addToUserPATH() { 
+  #TODO: Not tested yet
+  
+  local pathToBeAdded="$1"
+  local username="$2"
+  local rootdir="$3"  # Optional. Useful for jail or .deb creation
+  
+  local homedir
+  
+  [ "$username" != "" ] && homedir="/home/${username}" || homedir="$HOME"
+  
+  if ! cat "${rootdir}/${homedir}/.bashrc" 2>/dev/null \
+  | lineExists "PATH=${pathToBeAdded}:\$PATH"
+  then
+    echo "PATH=${pathToBeAdded}:\$PATH" >> "${HOME}/.bashrc" \
+    && return 0 || return 1
+  fi
+}
+
+
+rmFromSystemWidePATH() {
+  #TODO: Not tested yet
+  
+  local pathToBeRemoved="$1"
+  local rootdir="$2"  # Optional. Useful for jail or .deb creation
+  
+  local success=true
+  
+  [ "$username" != "" ] && homedir="/home/${username}" || homedir="$HOME"
+  
+  if ! cat "${rootdir}/etc/profile.d/toolsbashlib_add2path.sh" 2>/dev/null \
+  | lineExists "PATH=${pathToBeRemoved}:\$PATH"
+  then
+    sed -i "\%^PATH=${pathToBeRemoved}:.*%d" \
+    "${rootdir}/etc/profile.d/toolsbashlib_add2path.sh" \
+    && success=true || success=false
+  fi
+  
+  if [ "$success" == true ] \
+  && isFileEmpty "${rootdir}/etc/profile.d/toolsbashlib_add2path.sh"
+  then
+    rm -vf "${ROOTDIR}/etc/profile.d/${APPNAME}.sh" \
+    && success=true || success=false
+  fi
+  
+  [ "$success" == true ] && return 0 || return 0
+}
+  
+
+rmFromUserPATH() {
+  #TODO: Not tested yet
+  
+  local pathToBeRemoved="$1"
+  local username="$2"
+  local rootdir="$3"  # Optional. Useful for jail or .deb creation
+  
+  local homedir
+  
+  [ "$username" != "" ] && homedir="/home/${username}" || homedir="$HOME"
+  
+  if ! cat "${rootdir}/${homedir}/.bashrc" 2>/dev/null \
+  | lineExists "PATH=${pathToBeRemoved}:\$PATH"
+  then
+    sed -i "\%^PATH=${pathToBeRemoved}:.*%d" "${rootdir}/${homedir}/.bashrc" \
+    && return 0 || return 1
+  fi
+
 }
 
 
