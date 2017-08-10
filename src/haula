@@ -73,14 +73,12 @@ main()
   fi
 
 
-  SHORT_OPTS_INSTALL=":r:t:n:d:o:e:yhv"
-  LONG_OPTS_INSTALL="rootfs:,rfstype:,name:,descr:,osflavour:,destdir:,yes,help,version,onlyhelp"
+  SHORT_OPTS_INSTALL=":r:t:n:d:o:e:uyhv"
+  LONG_OPTS_INSTALL="rootfs:,rfstype:,name:,descr:,osflavour:,destdir:,uninstall,yes,help,version,onlyhelp"
 
   SHORT_OPTS_CONFIG=":i:s:k:n:p:yhv"
   LONG_OPTS_CONFIG="display:,hostname:,pkgs:,name:,repo2en:,yes,help,version,onlyhelp"
 
-  #SHORT_OPTS=`rmDuplic "," "${SHORT_OPTS_INSTALL}${SHORT_OPTS_CONFIG}"`
-  #LONG_OPTS=`rmDuplic "," "${LONG_OPTS_INSTALL}${LONG_OPTS_CONFIG}"`
   SHORT_OPTS="${SHORT_OPTS_INSTALL}${SHORT_OPTS_CONFIG}"
   LONG_OPTS="${LONG_OPTS_INSTALL},${LONG_OPTS_CONFIG}"
   args=`getopt -o $SHORT_OPTS --long $LONG_OPTS -- "$@"`
