@@ -1,17 +1,11 @@
 /*****************************************************************************/
 /**
- * @file       usage.info
- * @brief      Documentation about the XXX component usage
- * @author     XXX (CENTUM Solutions SLU)
+ * @file       usage.txt
+ * @brief      Documentation about the Haula component usage
+ * @author     Juan José Castro
  * @date       YYYY.MM.DD
  * @version    x.y.z
- * @copyright  CENTUM Solutions SLU, 2016
- * @copyright  COPYRIGHT NOTICE:
- * This software is property of CENTUM Solutions and has been forwarded to:
- * ............................, under the terms of contract:
- * ............................
- * Unauthorized duplication and disclosure to third parties is absolutely
- * forbidden.
+ * @license    GPLv3
  *****************************************************************************/
 
  
@@ -33,7 +27,14 @@ _______________________________________________________________________________
 1. Introduction
 ===============
 
-{Write here introduction}
+Utilidad que automatiza la instalación de jaulas basadas en schroot.
+Es capaz de instalar en una jaula schroot tanto un rootfs existente, en forma 
+de directorio en raw o de fichero .tar o .tar.gz, como descargarlo online 
+desde un repositorio de debootstrap, todo ello en un solo paso. También 
+permite realizar una configuración base típica del rootfs, por ejemplo 
+asegurando la existencia de ciertos paquetes instalados, creando las cuentas 
+de usuario con UIDs que correspondan con los del sistema anfitrión, 
+habilitando el uso de aplicaciones gráficas, etc.
 
 _______________________________________________________________________________
 2. Dependencies
