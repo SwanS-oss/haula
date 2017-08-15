@@ -136,6 +136,11 @@ Install a Linux rootfs inside a schroot jail.
 }
 
 
+echoerr () {
+  echo "error: $@" >&2
+}
+
+
 do_install ()
 {
   # Check resulting group number length
@@ -400,7 +405,7 @@ Entering to jail '${JAILNAME}' ($JAILRFSDIR)...
 !! Working as root is not recommended!!
 !!"
 if [ "$jailUserNameRecommended" != "" ]; then echo "\
-!! The recommended user account inside the jail is (has the same uid): 
+!! The recommended user account inside the jail (has the same uid) is: 
 !! $jailUserNameRecommended
 !!
 !! Run: 
@@ -450,8 +455,10 @@ $ ${DESTDIR}/${GOJAILSCRIPTNAME}
 }
 
 
-echoerr() {
-  echo "error: $@" >&2
+do_uninstall ()
+{
+  #TODO
+  echo "Feature not implemented yet"; exit 1
 }
 
 
@@ -462,6 +469,9 @@ echoerr() {
 
 main ()
 {
+  OPTUNINSTALL=false
+  OPTYES=false
+  
   ##################################################
   # Input arguments
 
@@ -495,7 +505,6 @@ main ()
                               DESTDIR="$1"
                               ;;
       -u | --uninstall )      OPTUNINSTALL=true
-                              echo "Feature not implemented yet"; exit 1
                               ;;
       -y | --yes )            OPTYES=true
                               ;;
@@ -523,7 +532,11 @@ main ()
   GOJAILSCRIPTNAME="go${JAILJAILNAME}.sh"
   user=`logname 2>/dev/null || echo ${SUDO_USER:-${USER}}`
   
-  do_install
+  if [ "$OPTUNINSTALL" != true ]; then
+    do_install
+  else
+    do_uninstall
+  fi
 }
 
 
