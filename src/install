@@ -11,6 +11,9 @@
 
 
 
+# EDIT install.conf to customize the installer
+
+
 # ====== INCLUDES ======
 
 . install.config  # Modify this file to customize the installer for an app
@@ -321,7 +324,7 @@ main()
   OPTUNATTENDED=false
   
   
-  SHORT_OPTS=":d:r:uh"
+  SHORT_OPTS=":d:r:b:l:m:k:uah"
   LONG_OPTS="instdir:,root:,bindir:,libdir:,kmoddir:,krelease:,unattended,uninstall,help"
   args=`getopt -o $SHORT_OPTS --long $LONG_OPTS -- "$@"`
   if [ $? -ne 0 ]; then

@@ -44,7 +44,7 @@ getThisScriptPwd() {
 # INCLUDES
 
 #. ${THIS_SCRIPT_PWD}/upvars-bash
-. ${THIS_SCRIPT_PWD}/tools-bash.0.7.0
+. ${THIS_SCRIPT_PWD}/tools-bash.0.7.1
 . ${THIS_SCRIPT_PWD}/haula-view
 . ${THIS_SCRIPT_PWD}/haula-ctr
 . ${THIS_SCRIPT_PWD}/haula-mdl
@@ -73,15 +73,15 @@ main()
   fi
 
 
-  SHORT_OPTS_INSTALL=":r:t:n:d:o:e:uyhv"
+  SHORT_OPTS_INSTALL="r:t:n:d:o:e:uyhv"
   LONG_OPTS_INSTALL="rootfs:,rfstype:,name:,descr:,osflavour:,destdir:,uninstall,yes,help,version,onlyhelp"
 
-  SHORT_OPTS_CONFIG=":i:s:k:n:p:yhv"
+  SHORT_OPTS_CONFIG="i:s:k:n:p:yhv"
   LONG_OPTS_CONFIG="display:,hostname:,pkgs:,name:,repo2en:,yes,help,version,onlyhelp"
 
   SHORT_OPTS="${SHORT_OPTS_INSTALL}${SHORT_OPTS_CONFIG}"
   LONG_OPTS="${LONG_OPTS_INSTALL},${LONG_OPTS_CONFIG}"
-  args=`getopt -o $SHORT_OPTS --long $LONG_OPTS -- "$@"`
+  args=`getopt -o :$SHORT_OPTS --long $LONG_OPTS -- "$@"`
   if [ $? -ne 0 ]; then
     show_option_error
     exit 1
